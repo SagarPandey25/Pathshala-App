@@ -22,6 +22,10 @@ fun AppNavHost(navController: NavHostController, authViewModel: AuthViewModel) {
             com.example.vbpathshala.ui.landing.LandingScreen(navController)
         }
 
+        composable(com.example.vbpathshala.navigation.Screen.Home.route) {
+            com.example.vbpathshala.ui.home.HomeScreen(navController)
+        }
+
         composable(com.example.vbpathshala.navigation.Screen.Login.route) {
             com.example.vbpathshala.ui.auth.login.LoginScreen(navController)
         }

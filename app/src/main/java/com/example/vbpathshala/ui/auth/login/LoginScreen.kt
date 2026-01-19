@@ -1,6 +1,7 @@
 package com.example.vbpathshala.ui.auth.login
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -119,19 +120,31 @@ fun LoginScreen(navController: NavHostController) {
 
     /* 🔐 AUTO LOGIN */
     LaunchedEffect(Unit) {
+        val TAG = "SessionCheck"
+
+        Log.d(TAG, "LaunchedEffect started")
+
         val prefs = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
         val isLoggedIn = prefs.getBoolean("isLoggedIn", false)
         val role = prefs.getString("role", "")
 
+        Log.d(TAG, "isLoggedIn = $isLoggedIn")
+        Log.d(TAG, "role = $role")
+
         if (isLoggedIn) {
-            if (role == "admin")
+            if (role == "admin") {
+                Log.d(TAG, "Navigating to Admin screen")
                 navController.navigate(Screen.Admin.route) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
-            else
+            } else {
+                Log.d(TAG, "Navigating to Home screen")
                 navController.navigate(Screen.Home.route) {
                     popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 }
+            }
+        } else {
+            Log.d(TAG, "User is not logged in")
         }
     }
 
