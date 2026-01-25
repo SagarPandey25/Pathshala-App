@@ -1,4 +1,6 @@
 package com.example.vbpathshala.ui.home
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -21,7 +24,7 @@ import androidx.navigation.NavHostController
 
 @Composable
 fun HomeScreen(navController: NavHostController) {
-
+    val context = LocalContext.current
     val primaryBlue = Color(0xFF0D47A1)
     val lightBlue = Color(0xFF1976D2)
 
@@ -39,7 +42,8 @@ fun HomeScreen(navController: NavHostController) {
                     )
             ) {
                 Row(
-                    modifier = Modifier
+
+                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -132,9 +136,15 @@ fun HomeScreen(navController: NavHostController) {
             // ---------- LOGOUT ----------
             Button(
                 onClick = {
-                    // ✅ Clear backstack and go to login
-                    navController.navigate("login_route") {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+
+                    // ✅ CLEAR SHARED PREFERENCES (SESSION DESTROY)
+                    val prefs = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
+                    prefs.edit().clear().apply()
+
+                    // ✅ GO TO LOGIN & CLEAR BACKSTACK
+                    navController.navigate("login") {
+                        popUpTo(0)              // 🔥 remove all previous screens
+                        launchSingleTop = true
                     }
                 },
                 shape = RoundedCornerShape(50),
@@ -150,6 +160,7 @@ fun HomeScreen(navController: NavHostController) {
                     fontWeight = FontWeight.Bold
                 )
             }
+
         }
     }
 }

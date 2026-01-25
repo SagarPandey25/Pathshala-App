@@ -1,16 +1,28 @@
 package com.example.vbpathshala.ui.auth.register
 
 import android.util.Patterns
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -22,247 +34,301 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.vbpathshala.navigation.Screen
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.POST
+
+/* -------------------- API MODELS -------------------- */
+data class RegisterRequest(
+    val first_name: String,
+    val last_name: String,
+    val email: String,
+    val password: String,
+    val mobile: String,
+    val gender: String
+)
+
+data class RegisterResponse(
+    val message: String,
+    val token: String,
+    val user: UserDto
+)
+
+data class UserDto(
+    val id: String,
+    val first_name: String,
+    val last_name: String,
+    val email: String,
+    val role: String,
+    val created_at: String,
+    val updated_at: String
+)
+
+/* -------------------- API SERVICE -------------------- */
+interface AuthApi {
+    @POST("register")
+    suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
+}
+
+/* -------------------- RETROFIT CLIENT -------------------- */
+object RetrofitClient {
+    private const val BASE_URL = "https://edu-backend-m610.onrender.com/api/"
+    val api: AuthApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(AuthApi::class.java)
+    }
+}
 
 /* -------------------- VIEWMODEL -------------------- */
 class RegisterViewModel : ViewModel() {
 
-    private val _loading = MutableStateFlow(false)
-    val loading: StateFlow<Boolean> = _loading
-
-    private val _success = MutableStateFlow(false)
-    val success: StateFlow<Boolean> = _success
-
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
+    var loading by mutableStateOf(false)
+    var success by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
 
     fun register(
-        first: String,
-        last: String,
+        firstName: String,
+        lastName: String,
         email: String,
         mobile: String,
         gender: String,
         password: String
     ) {
         viewModelScope.launch {
-            _loading.value = true
-            _error.value = null
+            loading = true
+            error = null
+            try {
+                val response = RetrofitClient.api.register(
+                    RegisterRequest(
+                        first_name = firstName,
+                        last_name = lastName,
+                        email = email,
+                        password = password,
+                        mobile = mobile,
+                        gender = gender
+                    )
+                )
 
-            // 🔐 Dummy registration (offline)
-            if (email == "test@gmail.com") {
-                _error.value = "Email already registered"
-            } else {
-                _success.value = true
+                if (response.isSuccessful && response.body() != null) {
+                    success = true
+                } else {
+                    // Parse API error if available
+                    error = response.errorBody()?.string() ?: "Registration failed"
+                }
+            } catch (e: Exception) {
+                error = e.localizedMessage ?: "Something went wrong"
+            } finally {
+                loading = false
             }
-
-            _loading.value = false
         }
     }
 }
 
-/* -------------------- COMPOSE SCREEN -------------------- */
+/* -------------------- REGISTER SCREEN -------------------- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RegisterScreen(navController: NavHostController) {
+fun RegisterScreen(navController: NavHostController, viewModel: RegisterViewModel = viewModel()) {
 
     var firstName by remember { mutableStateOf("") }
     var lastName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var mobile by remember { mutableStateOf("") }
-    var gender by remember { mutableStateOf("Male") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("Male") }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var inputError by remember { mutableStateOf<String?>(null) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
-    val viewModel: RegisterViewModel = viewModel()
-    val loading by viewModel.loading.collectAsState()
-    val success by viewModel.success.collectAsState()
-    val apiError by viewModel.error.collectAsState()
+    val scrollState = rememberScrollState()
 
-    // Navigate after success
-    LaunchedEffect(success) {
-        if (success) {
-            navController.navigate(Screen.Login.route) {
-                popUpTo(Screen.Register.route) { inclusive = true }
-            }
-        }
+    LaunchedEffect(viewModel.success) {
+        if (viewModel.success) showSuccessDialog = true
     }
 
-    val gradient = Brush.verticalGradient(
-        colors = listOf(Color(0xFF2575FC), Color(0xFF6A11CB))
-    )
+    val backgroundGradient = Brush.verticalGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2)))
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Register", color = Color.White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF2575FC))
-            )
-        }
-    ) { padding ->
+    Scaffold { padding ->
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(gradient)
+                .background(backgroundGradient)
                 .padding(padding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // ---- First & Last Name ----
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = firstName,
-                    onValueChange = { firstName = it },
-                    label = { Text("First Name") },
-                    modifier = Modifier.weight(1f)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(Color.White)
+                    .verticalScroll(scrollState)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+                Text(
+                    "Register For VB Pathshala \uD83D\uDC68\u200D\uD83C\uDF93",
+                    fontSize = 26.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = Color(0xFF5A67D8)
                 )
-                OutlinedTextField(
-                    value = lastName,
-                    onValueChange = { lastName = it },
-                    label = { Text("Last Name") },
-                    modifier = Modifier.weight(1f)
-                )
+                Spacer(Modifier.height(16.dp))
+
+                InputField("First Name", firstName) { firstName = it }
+                InputField("Last Name", lastName) { lastName = it }
+                InputField("Email", email) { email = it }
+                InputField("Mobile No.", mobile) { mobile = it }
+                GenderSelector(gender) { gender = it }
+                PasswordField("Password", password, passwordVisible, { passwordVisible = !passwordVisible }) { password = it }
+                PasswordField("Confirm Password", confirmPassword, confirmPasswordVisible, { confirmPasswordVisible = !confirmPasswordVisible }) { confirmPassword = it }
+
+                inputError?.let { Text(it, color = Color.Red, modifier = Modifier.padding(top = 8.dp)) }
+                viewModel.error?.let { Text(it, color = Color.Red, modifier = Modifier.padding(top = 8.dp)) }
+
+                Spacer(Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        when {
+                            firstName.isEmpty() || lastName.isEmpty() -> inputError = "Enter The Above Details"
+                            !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> inputError = "Invalid email"
+                            mobile.isEmpty() -> inputError = "Enter mobile number"
+                            password.length < 6 -> inputError = "Password must be at least 6 characters"
+                            password != confirmPassword -> inputError = "Passwords do not match"
+                            else -> {
+                                inputError = null
+                                viewModel.register(firstName, lastName, email, mobile, gender, password)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3CB371)),
+                    enabled = !viewModel.loading
+                ) {
+                    Text(if (viewModel.loading) "Registering..." else "Register", fontSize = 16.sp)
+                }
+
+                Spacer(Modifier.height(40.dp))
             }
 
-            Spacer(Modifier.height(12.dp))
-
-            // ---- Email ----
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            // ---- Mobile Number ----
-            OutlinedTextField(
-                value = mobile,
-                onValueChange = { mobile = it },
-                label = { Text("Mobile Number") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            // ---- Gender Selection ----
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Gender:", color = Color.White, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(12.dp))
-                listOf("Male", "Female", "Other").forEach { option ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = gender == option,
-                            onClick = { gender = option },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFFFFD700)
+            /* ---------- SUCCESS POPUP ---------- */
+            AnimatedVisibility(
+                visible = showSuccessDialog,
+                enter = scaleIn(initialScale = 0.7f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+                exit = scaleOut() + fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(
+                                Brush.verticalGradient(listOf(Color(0xFF43E97B), Color(0xFF38F9D7)))
                             )
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(72.dp)
                         )
-                        Text(option, color = Color.White)
-                        Spacer(Modifier.width(8.dp))
+
+                        Spacer(Modifier.height(12.dp))
+
+                        Text(
+                            "Registration Successful!",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        Spacer(Modifier.height(20.dp))
+
+                        Button(
+                            onClick = {
+                                showSuccessDialog = false
+                                viewModel.success = false
+                                navController.navigate("login") {
+                                    popUpTo("register") { inclusive = true }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+                        ) {
+                            Text("Continue to Login", color = Color(0xFF2F855A))
+                        }
                     }
                 }
             }
+        }
+    }
+}
 
-            Spacer(Modifier.height(12.dp))
+/* ---------- REUSABLE COMPONENTS ---------- */
+@Composable
+fun InputField(label: String, value: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        singleLine = true
+    )
+}
 
-            // ---- Password ----
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(imageVector = image, contentDescription = null)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+@Composable
+fun PasswordField(label: String, value: String, visible: Boolean, onToggle: () -> Unit, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = { IconButton(onClick = onToggle) { Icon(if (visible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff, contentDescription = null) } },
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        singleLine = true
+    )
+}
 
-            Spacer(Modifier.height(12.dp))
-
-            // ---- Confirm Password ----
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirm Password") },
-                visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    val image = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                    IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                        Icon(imageVector = image, contentDescription = null)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // ---- Input / API Errors ----
-            if (inputError != null) Text(inputError!!, color = Color.Yellow)
-            if (apiError != null) Text(apiError!!, color = Color.Red)
-
-            Spacer(Modifier.height(16.dp))
-
-            // ---- Register Button ----
-            Button(
-                onClick = {
-                    when {
-                        firstName.isBlank() || lastName.isBlank() || email.isBlank() ||
-                                mobile.isBlank() || password.isBlank() || confirmPassword.isBlank() -> {
-                            inputError = "Please fill all fields"
-                            return@Button
-                        }
-                        !Patterns.EMAIL_ADDRESS.matcher(email).matches() -> {
-                            inputError = "Invalid email"
-                            return@Button
-                        }
-                        mobile.length != 10 -> {
-                            inputError = "Mobile number must be 10 digits"
-                            return@Button
-                        }
-                        password.length < 6 -> {
-                            inputError = "Password must be at least 6 characters"
-                            return@Button
-                        }
-                        password != confirmPassword -> {
-                            inputError = "Passwords do not match"
-                            return@Button
-                        }
-                        else -> inputError = null
-                    }
-
-                    viewModel.register(
-                        first = firstName.trim(),
-                        last = lastName.trim(),
-                        email = email.trim(),
-                        mobile = mobile.trim(),
-                        gender = gender,
-                        password = password
+@Composable
+fun GenderSelector(selected: String, onSelect: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Text("Gender", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            listOf("Male ", "Female", "Others").forEach { gender ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            if (gender == selected) Color(0xFF5A67D8) else Color(0xFFE0E0E0)
+                        )
+                        .clickable { onSelect(gender) }
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        gender,
+                        color = if (gender == selected) Color.White else Color.Black,
+                        fontWeight = if (gender == selected) FontWeight.Bold else FontWeight.Normal
                     )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(25.dp),
-                enabled = !loading
-            ) {
-                Text(if (loading) "Registering..." else "Register", fontSize = 16.sp)
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            TextButton(onClick = { navController.navigate(Screen.Login.route) }) {
-                Text("Already have an account? Login", color = Color.White)
+                }
             }
         }
     }

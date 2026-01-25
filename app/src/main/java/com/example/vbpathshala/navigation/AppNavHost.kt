@@ -14,6 +14,7 @@ import com.example.vbpathshala.ui.admin.AdminScreen
 
 @Composable
 fun AppNavHost(navController: NavHostController, authViewModel: AuthViewModel) {
+
     NavHost(
         navController = navController,
         startDestination = com.example.vbpathshala.navigation.Screen.Landing.route
