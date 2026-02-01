@@ -1,6 +1,5 @@
 package com.example.vbpathshala.ui.auth.login
 
-import android.content.Context
 import android.util.Patterns
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -30,6 +29,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.vbpathshala.data.session.SessionManager
 import com.example.vbpathshala.navigation.Screen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,8 +42,22 @@ import retrofit2.http.POST
 /* ---------------- API ---------------- */
 
 data class LoginRequest(val email: String, val password: String)
-data class User(val id: String, val email: String, val role: String)
-data class LoginResponse(val message: String, val token: String, val user: User)
+
+/* ✅ UPDATED USER MODEL */
+data class User(
+    val id: String,
+    val first_name: String,
+    val last_name: String,
+    val email: String,
+    val role: String,
+    val created_at: String
+)
+
+data class LoginResponse(
+    val message: String,
+    val token: String,
+    val user: User
+)
 
 interface AuthApi {
     @POST("auth/login")
@@ -74,8 +88,8 @@ class LoginViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
-    private val _role = MutableStateFlow<String?>(null)
-    val role: StateFlow<String?> = _role
+    private val _response = MutableStateFlow<LoginResponse?>(null)
+    val response: StateFlow<LoginResponse?> = _response
 
     fun login(email: String, password: String) {
         viewModelScope.launch {
@@ -84,7 +98,7 @@ class LoginViewModel : ViewModel() {
             try {
                 val res = RetrofitClient.api.login(LoginRequest(email, password))
                 if (res.isSuccessful && res.body() != null) {
-                    _role.value = res.body()!!.user.role
+                    _response.value = res.body()
                     _success.value = true
                 } else {
                     _error.value = "Invalid email or password"
@@ -107,7 +121,7 @@ fun LoginScreen(navController: NavHostController) {
 
     val loading by viewModel.loading.collectAsState()
     val success by viewModel.success.collectAsState()
-    val role by viewModel.role.collectAsState()
+    val response by viewModel.response.collectAsState()
     val apiError by viewModel.error.collectAsState()
 
     val isDark = isSystemInDarkTheme()
@@ -126,23 +140,34 @@ fun LoginScreen(navController: NavHostController) {
 
     /* Auto Login */
     LaunchedEffect(Unit) {
-        val prefs = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("isLoggedIn", false)) {
+        if (SessionManager.isLoggedIn(context)) {
+            val user = SessionManager.getUser(context)
+
             navController.navigate(
-                if (prefs.getString("role", "") == "admin")
-                    Screen.Admin.route else Screen.Home.route
+                if (user.role == "Admin")
+                    Screen.Admin.route
+                else
+                    Screen.Home.route
             ) { popUpTo(0) }
         }
     }
 
     /* Navigate after login */
     LaunchedEffect(success) {
-        if (success && role != null) {
-            val prefs = context.getSharedPreferences("user_session", Context.MODE_PRIVATE)
-            prefs.edit().putBoolean("isLoggedIn", true).putString("role", role).apply()
+        if (success && response != null) {
+
+            // ✅ SAVE FULL USER DATA
+            SessionManager.saveSession(
+                context,
+                response!!.token,
+                response!!.user
+            )
 
             navController.navigate(
-                if (role == "admin") Screen.Admin.route else Screen.Home.route
+                if (response!!.user.role == "Admin")
+                    Screen.Admin.route
+                else
+                    Screen.Home.route
             ) { popUpTo(0) }
         }
     }
@@ -158,7 +183,9 @@ fun LoginScreen(navController: NavHostController) {
         Brush.verticalGradient(listOf(Color(0xFF2193B0), Color(0xFF6DD5ED)))
 
     Box(
-        modifier = Modifier.fillMaxSize().background(bgGradient),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(bgGradient),
         contentAlignment = Alignment.Center
     ) {
 
@@ -187,10 +214,7 @@ fun LoginScreen(navController: NavHostController) {
                 .border(
                     2.dp,
                     Brush.linearGradient(
-                        listOf(
-                            Color(0xFF00F5FF),
-                            Color(0xFFFF00FF)
-                        )
+                        listOf(Color(0xFF00F5FF), Color(0xFFFF00FF))
                     ),
                     RoundedCornerShape(28.dp)
                 )
@@ -237,7 +261,8 @@ fun LoginScreen(navController: NavHostController) {
                 trailingIcon = {
                     IconButton(onClick = { showPass = !showPass }) {
                         Icon(
-                            if (showPass) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            if (showPass) Icons.Default.Visibility
+                            else Icons.Default.VisibilityOff,
                             null
                         )
                     }
@@ -272,7 +297,9 @@ fun LoginScreen(navController: NavHostController) {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent)
             ) {
@@ -311,3 +338,4 @@ fun LoginScreen(navController: NavHostController) {
         }
     }
 }
+

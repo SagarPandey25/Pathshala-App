@@ -1,4 +1,5 @@
 package com.example.vbpathshala.ui.admin
+import android.util.Log
 
 import android.content.Context
 import android.net.Uri
@@ -34,7 +35,10 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Multipart
 import retrofit2.http.POST
+import com.example.vbpathshala.data.network.AuthInterceptor.AuthInterceptor
 import retrofit2.http.Part
+import okhttp3.OkHttpClient
+
 
 /* ---------------- API ---------------- */
 
@@ -48,16 +52,23 @@ interface UploadApi {
 }
 
 object RetrofitClient {
-    private const val BASE_URL = "https://vimal-testing.t3.storage.dev/"
+    private const val BASE_URL = "https://edu-backend-m610.onrender.com/api/"
 
-    val api: UploadApi by lazy {
-        Retrofit.Builder()
+    fun api(context: Context): UploadApi {
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(context))
+            .build()
+
+        return Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(UploadApi::class.java)
     }
 }
+
 
 /* ---------------- MODELS ---------------- */
 
@@ -75,11 +86,27 @@ data class Note(
 /* ---------------- UTIL ---------------- */
 
 fun uriToMultipart(context: Context, uri: Uri): MultipartBody.Part {
-    val inputStream = context.contentResolver.openInputStream(uri)!!
-    val bytes = inputStream.readBytes()
-    val requestBody = bytes.toRequestBody("application/pdf".toMediaType())
+    val contentResolver = context.contentResolver
 
-    return MultipartBody.Part.createFormData("file", "upload.pdf", requestBody)
+    val mimeType = contentResolver.getType(uri) ?: "application/pdf"
+
+    val fileName = contentResolver
+        .query(uri, null, null, null, null)
+        ?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex("_display_name")
+            cursor.moveToFirst()
+            cursor.getString(nameIndex)
+        } ?: "upload.pdf"
+
+    val inputStream = contentResolver.openInputStream(uri)!!
+    val requestBody =
+        inputStream.readBytes().toRequestBody(mimeType.toMediaType())
+
+    return MultipartBody.Part.createFormData(
+        "file",        // MUST be exactly "file"
+        fileName,      // REAL filename
+        requestBody
+    )
 }
 
 /* ---------------- UI ---------------- */
@@ -245,23 +272,38 @@ fun AdminScreen(navController: NavHostController) {
 
                             scope.launch {
                                 try {
+                                    Log.d("UploadNote", "Upload started")
+
                                     val filePart = uriToMultipart(context, selectedUri!!)
                                     val titlePart = fileName.toRequestBody("text/plain".toMediaType())
 
-                                    val response = RetrofitClient.api.uploadNote(filePart, titlePart)
+                                    Log.d("UploadNote", "File name: $fileName")
+                                    Log.d("UploadNote", "Calling upload API")
+
+                                    val response = RetrofitClient
+                                        .api(context)
+                                        .uploadNote(filePart, titlePart)
 
                                     if (response.isSuccessful) {
+                                        Log.d("UploadNote", "Upload success: ${response.code()}")
                                         Toast.makeText(context, "Upload Success", Toast.LENGTH_SHORT).show()
+
                                         fileName = ""
                                         selectedFileText = "No file selected"
                                         selectedUri = null
                                     } else {
+                                        Log.e(
+                                            "UploadNote",
+                                            "Upload failed: ${response.code()} - ${response.errorBody()?.string()}"
+                                        )
                                         Toast.makeText(context, "Upload Failed", Toast.LENGTH_SHORT).show()
                                     }
 
                                 } catch (e: Exception) {
+                                    Log.e("UploadNote", "Exception during upload", e)
                                     Toast.makeText(context, e.message, Toast.LENGTH_LONG).show()
                                 }
+
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF001F80)),

@@ -4,12 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.vbpathshala.ui.landing.LandingScreen
-import com.example.vbpathshala.ui.auth.login.LoginScreen
-import com.example.vbpathshala.ui.auth.register.RegisterScreen
-import com.example.vbpathshala.ui.home.HomeScreen
 import com.example.vbpathshala.viewmodel.AuthViewModel
-import com.example.vbpathshala.ui.admin.AdminScreen
 
 
 @Composable
@@ -24,8 +19,12 @@ fun AppNavHost(navController: NavHostController, authViewModel: AuthViewModel) {
         }
 
         composable(com.example.vbpathshala.navigation.Screen.Home.route) {
-            com.example.vbpathshala.ui.home.HomeScreen(navController)
+            com.example.vbpathshala.ui.studentpanel.HomeScreen(navController)
         }
+        composable(com.example.vbpathshala.navigation.Screen.Admin.route) {
+            com.example.vbpathshala.ui.admin.AdminScreen(navController)
+        }
+
 
         composable(com.example.vbpathshala.navigation.Screen.Login.route) {
             com.example.vbpathshala.ui.auth.login.LoginScreen(navController)
@@ -34,5 +33,9 @@ fun AppNavHost(navController: NavHostController, authViewModel: AuthViewModel) {
         composable(com.example.vbpathshala.navigation.Screen.Register.route) {
             com.example.vbpathshala.ui.auth.register.RegisterScreen(navController)
         }
+        composable(com.example.vbpathshala.ui.studentpanel.studentdetail.StudentDetailScreen.route) {
+            com.example.vbpathshala.ui.studentpanel(navController)
+        }
     }
+
 }

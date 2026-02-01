@@ -69,7 +69,7 @@ data class UserDto(
 
 /* -------------------- API SERVICE -------------------- */
 interface AuthApi {
-    @POST("register")
+    @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): Response<RegisterResponse>
 }
 
