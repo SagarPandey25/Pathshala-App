@@ -19,13 +19,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
 import com.example.vbpathshala.data.session.SessionManager
 import com.example.vbpathshala.navigation.Screen
 
 @Composable
-fun StudentDetailScreen(
-    onLogout: () -> Unit = {}
-) {
+fun StudentDetailScreen(navController: NavHostController) {
+
+//    onLogout: () -> Unit = {}
+
     val context = LocalContext.current
     val user = remember { SessionManager.getUser(context) }
 
@@ -97,7 +99,7 @@ fun StudentDetailScreen(
                 Button(
                     onClick = {
                         SessionManager.clearSession(context)
-                        onLogout()
+//                        onLogout()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(

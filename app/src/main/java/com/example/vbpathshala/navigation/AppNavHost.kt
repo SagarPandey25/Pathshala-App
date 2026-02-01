@@ -33,8 +33,11 @@ fun AppNavHost(navController: NavHostController, authViewModel: AuthViewModel) {
         composable(com.example.vbpathshala.navigation.Screen.Register.route) {
             com.example.vbpathshala.ui.auth.register.RegisterScreen(navController)
         }
-        composable(com.example.vbpathshala.ui.studentpanel.studentdetail.StudentDetailScreen.route) {
-            com.example.vbpathshala.ui.studentpanel(navController)
+        composable(com.example.vbpathshala.navigation.Screen.StudentDetail.route) {
+            com.example.vbpathshala.ui.studentpanel.studentdetail.StudentDetailScreen(navController)
+        }
+        composable(com.example.vbpathshala.navigation.Screen.Notes.route) {
+            com.example.vbpathshala.ui.studentpanel.notes.NotesScreen(navController)
         }
     }
 

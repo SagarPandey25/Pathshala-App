@@ -98,7 +98,7 @@ fun HomeScreen(navController: NavHostController) {
                     title = "Student Details",
                     icon = Icons.Default.AccountCircle,
                     color = primaryBlue,
-                    onClick = { navController.navigate("student_details_route") }
+                    onClick = { navController.navigate("student-detail") }
                 )
                 DashboardCard(
                     title = "Performance",
@@ -125,7 +125,7 @@ fun HomeScreen(navController: NavHostController) {
                     title = "Notes",
                     icon = Icons.Default.Description,
                     color = primaryBlue,
-                    onClick = { navController.navigate("notes_route") }
+                    onClick = { navController.navigate("notes") }
                 )
             }
 
